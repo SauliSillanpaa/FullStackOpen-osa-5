@@ -55,11 +55,15 @@ const Blog = ({ blog, update, remove, thisUser }) => {
   const showFull = () => (
     <div>
       {blog.title} {blog.author}
-      <button onClick={toggleVisibility}>hide</button> <br />
-      {blog.url} <br />
+      <button onClick={toggleVisibility}>hide</button>
+      <br />
+      {blog.url}
+      <br />
       likes {blogLikes}
-      <button onClick={addLike}>like</button> <br/>
-      {blog.author} <br />
+      <button onClick={addLike}>like</button>
+      <br/>
+      {blog.author}
+      <br />
       {deleteButton()}
     </div>
   )

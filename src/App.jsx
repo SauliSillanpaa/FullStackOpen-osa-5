@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react'
-//import Footer from './components/Footer'
+import { useState, useEffect, useRef } from 'react'
 import Blog from './components/Blog'
 import Notification from './components/Notification'
+import LoginForm from './components/LoginForm'
+import BlogForm from './components/BlogForm'
+import Togglable from './components/Togglable'
 import loginService from './services/login'
 import blogService from './services/blogs'
 
@@ -9,18 +11,17 @@ let isError = false
 
 const App = () => {
   const [blogs, setBlogs] = useState([])
-  const [newBlog, setNewBlog] = useState('')
-  const [newAuthor, setNewAuthor] = useState('')
-  const [newURL, setNewURL] = useState('')
   const [notification, setNotification] = useState(null)
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [user, setUser] = useState(null)
 
+  const blogFormRef = useRef()
+
   useEffect(() => {
     blogService.getAll().then(blogs =>
       setBlogs( blogs )
-    )  
+    )
   }, [])
 
   useEffect(() => {
@@ -32,27 +33,19 @@ const App = () => {
     }
   }, [])
 
-  const addBlog = event => {
-    event.preventDefault()
-    const blogObject = {
-      title: newBlog,
-      author: newAuthor,
-      url: newURL
-    }
+  const addBlog = async blogObject => {
+    blogFormRef.current.toggleVisibility()
 
     try {
-      blogService.create(blogObject).then(returnedBlog => {
-        isError=false
-        setNotification(`a new blog ${newBlog} by ${newAuthor} added`)
-        setTimeout(() => {
-          setNotification(null)
-        }, 5000)
+      await blogService.create(blogObject)
+      isError=false
+      setNotification(`a new blog ${blogObject.title} by ${blogObject.author} added`)
+      setTimeout(() => {
+        setNotification(null)
+      }, 5000)
 
-        setBlogs(blogs.concat(returnedBlog))
-        setNewBlog('')
-        setNewAuthor('')
-        setNewURL('')
-      })
+      const newBlogs = await blogService.getAll()
+      setBlogs(newBlogs)
     } catch {
       isError=true
       setNotification('Could not add a new blog')
@@ -63,16 +56,63 @@ const App = () => {
 
   }
 
+  const updateBlog = async blogObject => {
+
+    try {
+      await blogService.update(blogObject)
+      //console.log(`Adding the update for blog:`)
+      //console.log(returnedBlog)
+      isError=false
+      setNotification('successful update')
+      setTimeout(() => {
+        setNotification(null)
+      }, 5000)
+
+      const newBlogs = await blogService.getAll()
+      setBlogs(newBlogs)
+    } catch {
+      isError=true
+      setNotification('could not update')
+      setTimeout(() => {
+        setNotification(null)
+      }, 5000)
+    }
+
+  }
+
+  const removeBlog = async blogObject => {
+
+    try {
+      await blogService.deleteBlog(blogObject)
+      //console.log(`Adding the update for blog:`)
+      //console.log(returnedBlog)
+      isError=false
+      setNotification('successful delete')
+      setTimeout(() => {
+        setNotification(null)
+      }, 5000)
+      const newBlogs = await blogService.getAll()
+      setBlogs(newBlogs)
+    } catch {
+      isError=true
+      setNotification('could not delete')
+      setTimeout(() => {
+        setNotification(null)
+      }, 5000)
+    }
+
+  }
+
   const handleLogin = async event => {
     event.preventDefault()
-    
+
     try {
       const user = await loginService.login({
         username, password
       })
       window.localStorage.setItem(
         'loggedBlogappUser', JSON.stringify(user)
-      ) 
+      )
       blogService.setToken(user.token)
       setUser(user)
       setUsername('')
@@ -103,30 +143,15 @@ const App = () => {
   }
 
   const loginForm = () => (
-    <form onSubmit={handleLogin}>
-      <div>
-        <h2>log in to application</h2>
-        <label>
-          username
-          <input
-            type="text"
-            value={username}
-            onChange={({ target }) => setUsername(target.value)}
-          />
-        </label>
-      </div>
-      <div>
-        <label>
-          password
-          <input
-            type="password"
-            value={password}
-            onChange={({ target }) => setPassword(target.value)}
-          />
-        </label>
-      </div>
-      <button type="submit">login</button>
-    </form>
+    <Togglable buttonLabel="login">
+      <LoginForm
+        username={username}
+        password={password}
+        handleUsernameChange={({ target }) => setUsername(target.value)}
+        handlePasswordChange={({ target }) => setPassword(target.value)}
+        handleSubmit={handleLogin}
+      />
+    </Togglable>
   )
 
   const logoutForm = () => (
@@ -136,46 +161,38 @@ const App = () => {
     </form>
   )
 
+  const compare = (blogA, blogB) => (
+    blogB.likes - blogA.likes
+  )
+
   const showBlogs = () => (
     <div>
-      {blogs.map(blog =>
-        <Blog key={blog.id} blog={blog} />
+      {blogs.sort(compare).map(blog =>
+        <Blog key={blog.id} blog={blog} update={updateBlog} remove={removeBlog} thisUser={user}/>
       )}
     </div>
   )
 
   const blogForm = () => (
-    <form onSubmit={addBlog}>
-      <div>
-        Title: 
-        <input value={newBlog} onChange={({ target }) => setNewBlog(target.value)} />
-      </div>
-      <div>
-        Author: 
-        <input value={newAuthor} onChange={({ target }) => setNewAuthor(target.value)} />
-      </div>
-      <div>
-        URL: 
-        <input value={newURL} onChange={({ target }) => setNewURL(target.value)} />
-      </div>
-      <button type="submit">create</button>
-    </form>
+    <Togglable buttonLabel="create new blog" ref={blogFormRef}>
+      <BlogForm createBlog={addBlog} />
+    </Togglable>
   )
 
   return (
     <div>
       <Notification message={notification} isError={isError}/>
-      
       {!user && loginForm()}
       {user && (
         <div>
           <h2>blogs</h2>
           {logoutForm()}
-          <h2>create new</h2>
+          <br />
           {blogForm()}
+          <br />
           {showBlogs()}
         </div>
-      )}      
+      )}
     </div>
   )
 }
